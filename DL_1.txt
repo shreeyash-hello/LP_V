@@ -13,6 +13,10 @@ data
 corr = data.corr()
 corr.shape
 
+# Plotting the heatmap of correlation between features
+plt.figure(figsize=(20,20))
+sns.heatmap(corr, cbar=True, square= True, fmt='.1f', annot=True, annot_kws={'size':15}, cmap='gray')
+
 X =data.drop(['MEDV'], axis = 1)# data['area']#
 y = data['MEDV']
 
@@ -50,7 +54,7 @@ model.add(Dense(40, activation = 'relu'))
 model.add(Dropout(0.15))
 model.add(Dense(54, activation = 'relu'))
 model.add(Dropout(0.18))
-model.add(Dense(1))
+model.add(Dense(1, activation = 'linear'))
 
 model.compile(optimizer = 'adam', loss = 'mean_squared_error', metrics = ['mse', 'mae'])
 
