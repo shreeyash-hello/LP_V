@@ -1,0 +1,111 @@
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+import warnings
+import datetime
+import seaborn as sns
+from sklearn.preprocessing import MinMaxScaler
+from sklearn.decomposition import PCA
+from sklearn.model_selection import train_test_split
+from tensorflow.keras import Sequential
+from tensorflow.keras.layers import Dense
+from tensorflow.keras.layers import LSTM
+from sklearn.metrics import r2_score
+
+data=pd.read_csv("/content/Google_Stock_Price_Train.csv")
+data
+
+data['Close']=data['Close'].str.replace(',','').astype(float)
+data['Volume']=data['Volume'].str.replace(',','').astype(float)
+
+data[['Open','High','Low','Close','Volume']].plot(kind= 'box' ,layout=(1,5),subplots=True)
+plt.show()
+
+scaler = MinMaxScaler()
+data_without_date = data[['Open','High','Low','Close','Volume']]
+data_scaled = pd.DataFrame(scaler.fit_transform(data_without_date))
+
+data_scaled
+
+plt.figure(figsize=(6,6))
+sns.heatmap(data.corr())
+
+data_scaled=data_scaled.drop([1,2,4], axis=1)
+data_scaled
+
+def split_seq_multivariate(sequence, n_past, n_future):
+
+  x, y = [], []
+  for window_start in range(len(sequence)):
+      past_end = window_start + n_past
+      future_end = past_end + n_future
+      if future_end > len(sequence):
+        break
+      # slicing the past and future parts of the window
+      past = sequence[window_start:past_end, :]
+      future = sequence[past_end:future_end, -1]
+      x.append(past)
+      y.append(future)
+  return np.array(x), np.array(y)
+
+# specify the window size
+n_steps = 60
+data_scaled = data_scaled.to_numpy()
+data_scaled.shape
+
+X, y = split_seq_multivariate(data_scaled, n_steps,1)
+
+# X is in the shape of [samples, timesteps, features]
+print(X.shape)
+print(y.shape)
+# make y to the shape of [samples]
+y=y[:,0]
+y.shape
+
+# split into train/test
+X_train, X_test, y_train, y_test = train_test_split(X,y,test_size=0.2,random_state=50)
+print(X_train.shape, X_test.shape, y_train.shape, y_test.shape)
+
+# further dividing the training set into train and validation data
+X_train, X_val, y_train, y_val = train_test_split(X_train,y_train,test_size=0.2,random_state=30)
+
+# define RNN model
+model = Sequential()
+model.add(LSTM(612, input_shape=(n_steps,2)))
+model.add(Dense(50, activation='relu'))
+model.add(Dense(50, activation='relu'))
+model.add(Dense(30, activation='relu'))
+model.add(Dense(1))
+
+model.summary()
+
+model.compile(optimizer='adam', loss='mse', metrics=['mae'])
+
+# fit the model
+history = model.fit(X_train, y_train, epochs=100, batch_size=32, verbose=2, validation_data=(X_val, y_val))
+
+# evaluate the model
+mse, mae = model.evaluate(X_test, y_test, verbose=0)
+print('MSE: %.3f, RMSE: %.3f, MAE: %.3f' % (mse, np.sqrt(mse), mae)) 
+
+
+# predicting y_test values
+print(X_test.shape)
+predicted_values = model.predict(X_test)
+print(predicted_values.shape)
+# print(predicted_values)
+     
+
+plt.plot(y_test,c = 'r')
+plt.plot(predicted_values,c = 'y')
+plt.xlabel('Day')
+plt.ylabel('Stock Price Volume')
+plt.title('Stock Price Volume Prediction Graph using RNN (LSTM)')
+plt.legend(['Actual','Predicted'],loc = 'lower right')
+plt.figure(figsize=(10,6))
+
+# evaluating using R squared
+R_square = r2_score(y_test, predicted_values) 
+ 
+print(R_square)
