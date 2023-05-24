@@ -2,6 +2,9 @@
 //   Type the command ""nvcc <file_name>.cu""
 //   then "" ./a.out""
 
+// For Google Colab - 
+//     !pip install git+https://github.com/andreinechaev/nvcc4jupyter.git
+//     %load_ext nvcc_plugin
 --------------------------------------------------------------------------------------------
 // VECTOR ADDITION
 %%cu
