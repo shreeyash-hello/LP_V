@@ -4,37 +4,69 @@
 
 --------------------------------------------------------------------------------------------
 // VECTOR ADDITION
-#include "stdio.h"
-#include "math.h"
-#define N 10
-void add ( int *a, int *b, int *c )
-{
-    int tid = 0; // this is CPU zero, so we start at zero
+%%cu
 
-    while (tid < N)
-    {
+#include <iostream>
+
+// CUDA kernel for vector addition
+__global__ void vectorAdd(int* a, int* b, int* c, int size) {
+    int tid = blockIdx.x * blockDim.x + threadIdx.x;
+    if (tid < size) {
         c[tid] = a[tid] + b[tid];
-        tid += 1; // we have one CPU, so we increment by one
     }
 }
-int main( void )
-{
-    int a[N], b[N], c[N];
 
-    // fill the arrays 'a' and 'b' on the CPU
-    for (int i=0; i<N; i++)
-    {
-        a [i] = i;
-        b[i] = i * i;
+int main() {
+    int size = 100;  // Size of the vectors
+    int* a, * b, * c;    // Host vectors
+    int* dev_a, * dev_b, * dev_c;  // Device vectors
+
+    // Allocate memory for host vectors
+    a = (int*)malloc(size * sizeof(int));
+    b = (int*)malloc(size * sizeof(int));
+    c = (int*)malloc(size * sizeof(int));
+
+    // Initialize host vectors
+    for (int i = 0; i < size; i++) {
+        a[i] = i;
+        b[i] = 2 * i;
     }
-    add( a, b, c );
-    // display the results
-    for (int i=0; i<N; i++)
-    {
-        printf( "%d + %d = %d\n", a[i], b[i], c[i] );
+
+    // Allocate memory on the device for device vectors
+    cudaMalloc((void**)&dev_a, size * sizeof(int));
+    cudaMalloc((void**)&dev_b, size * sizeof(int));
+    cudaMalloc((void**)&dev_c, size * sizeof(int));
+
+    // Copy host vectors to device
+    cudaMemcpy(dev_a, a, size * sizeof(int), cudaMemcpyHostToDevice);
+    cudaMemcpy(dev_b, b, size * sizeof(int), cudaMemcpyHostToDevice);
+
+    // Launch kernel for vector addition
+    int blockSize = 256;
+    int gridSize = (size + blockSize - 1) / blockSize;
+    vectorAdd<<<gridSize, blockSize>>>(dev_a, dev_b, dev_c, size);
+
+    // Copy result from device to host
+    cudaMemcpy(c, dev_c, size * sizeof(int), cudaMemcpyDeviceToHost);
+
+    // Print result
+    for (int i = 0; i < size; i++) {
+        std::cout << a[i] << " + " << b[i] << " = " << c[i] << std::endl;
     }
+
+    // Free device memory
+    cudaFree(dev_a);
+    cudaFree(dev_b);
+    cudaFree(dev_c);
+
+    // Free host memory
+    free(a);
+    free(b);
+    free(c);
+
     return 0;
 }
+
 -------------------------------------------------------------------------------------------------------------
   
 // MATRIX MULTIPLICATION
