@@ -1,3 +1,5 @@
+// g++ filename.cpp -o filename.exe -fopenmp ./filename.exe
+
 #include <iostream>
 #include <queue>
 #include <omp.h>
