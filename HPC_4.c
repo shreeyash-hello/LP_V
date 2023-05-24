@@ -70,70 +70,85 @@ int main() {
 -------------------------------------------------------------------------------------------------------------
   
 // MATRIX MULTIPLICATION
+%%cu
+
 #include<stdio.h>
 #include<cuda.h>
-#define row1 2 /* Number of rows of first matrix */
-#define col1 3 /* Number of columns of first matrix */
-#define row2 3 /* Number of rows of second matrix */
-#define col2 2 /* Number of columns of second matrix */
-__global__ void matadd(int *l,int *m, int *n)
-{
-    int x=threadIdx.x;
-    int y=threadIdx.y;
-    int k;
-    n[col2*y+x]=0;
-    for(k=0;k<col1;k++)
-    {
-        n[col2*y+x]=n[col2*y+x]+l[col1*y+k]*m[col2*k+x];
+// CUDA kernel for matrix multiplication
+__global__ void matrixMul(int* a, int* b, int* c, int rowsA, int colsA, int colsB) {
+    int row = blockIdx.y * blockDim.y + threadIdx.y;
+    int col = blockIdx.x * blockDim.x + threadIdx.x;
+    int sum = 0;
+    if (row < rowsA && col < colsB) {
+        for (int i = 0; i < colsA; i++) {
+            sum += a[row * colsA + i] * b[i * colsB + col];
+        }
+        c[row * colsB + col] = sum;
     }
 }
-int main()
-{
-    int a[row1][col1];
-    int b[row2][col2];
-    int c[row1][col2];
-    int *d,*e,*f;
-    int i,j;
-    printf("\n Enter elements of first matrix of size 2*3\n");
-    for(i=0;i<row1;i++)
-    {
-        for(j=0;j<col1;j++)
-        {
-            scanf("%d",&a[i][j]);
-        }
-    }
-    printf("\n Enter elements of second matrix of size 3*2\n");
-    for(i=0;i<row2;i++)
-    {
-        for(j=0;j<col2;j++)
-        {
-            scanf("%d",&b[i][j]);
-        }
-    }
-    cudaMalloc((void **)&d,row1*col1*sizeof(int));
-    cudaMalloc((void **)&e,row2*col2*sizeof(int));
-    cudaMalloc((void **)&f,row1*col2*sizeof(int));
-    cudaMemcpy(d,a,row1*col1*sizeof(int),cudaMemcpyHostToDevice);
-    cudaMemcpy(e,b,row2*col2*sizeof(int),cudaMemcpyHostToDevice);
-    dim3 threadBlock(col2,row1);
-/* Here we are defining two dimensional Grid(collection of blocks) structure. Syntax is dim3 
-grid(no. of columns,no. of rows) */
-    matadd<<<1,threadBlock>>>(d,e,f);
-    cudaMemcpy(c,f,row1*col2*sizeof(int),cudaMemcpyDeviceToHost);
 
-    printf("\nProduct of two matrices:\n ");
-    for(i=0;i<row1;i++)
-    {
-        for(j=0;j<col2;j++)
-        {
-            printf("%d\t",c[i][j]);
+int main() {
+    int rowsA = 10;  // Rows of matrix A
+    int colsA = 10;  // Columns of matrix A
+    int rowsB = colsA; // Rows of matrix B
+    int colsB = 10;  // Columns of matrix B
+
+    int* a, * b, * c;  // Host matrices
+    int* dev_a, * dev_b, * dev_c;  // Device matrices
+
+    // Allocate memory for host matrices
+    a = (int*)malloc(rowsA * colsA * sizeof(int));
+    b = (int*)malloc(rowsB * colsB * sizeof(int));
+    c = (int*)malloc(rowsA * colsB * sizeof(int));
+
+    // Initialize host matrices
+    for (int i = 0; i < rowsA * colsA; i++) {
+        a[i] = i;
+    }
+    for (int i = 0; i < rowsB * colsB; i++) {
+        b[i] = 2 * i;
+    }
+
+    // Allocate memory on the device for device matrices
+    cudaMalloc((void**)&dev_a, rowsA * colsA * sizeof(int));
+    cudaMalloc((void**)&dev_b, rowsB * colsB * sizeof(int));
+    cudaMalloc((void**)&dev_c, rowsA * colsB * sizeof(int));
+
+    // Copy host matrices to device
+    cudaMemcpy(dev_a, a, rowsA * colsA * sizeof(int), cudaMemcpyHostToDevice);
+    cudaMemcpy(dev_b, b, rowsB * colsB * sizeof(int), cudaMemcpyHostToDevice);
+
+    // Define grid and block dimensions
+    dim3 blockSize(16, 16);
+    dim3 gridSize((colsB + blockSize.x - 1) / blockSize.x, (rowsA + blockSize.y - 1) / blockSize.y);
+
+    // Launch kernel for matrix multiplication
+    matrixMul<<<gridSize, blockSize>>>(dev_a, dev_b, dev_c, rowsA, colsA, colsB);
+
+    // Copy result from device to host
+    cudaMemcpy(c, dev_c, rowsA * colsB * sizeof(int), cudaMemcpyDeviceToHost);
+
+    // Print result
+    printf("Result:\n");
+    for (int i = 0; i < rowsA; i++) {
+        for (int j = 0; j < colsB; j++) {
+            printf("%d ", c[i * colsB + j]);
         }
         printf("\n");
     }
-    cudaFree(d);
-    cudaFree(e);
-    cudaFree(f);
+
+    // Free device memory
+    cudaFree(dev_a);
+    cudaFree(dev_b);
+    cudaFree(dev_c);
+
+    // Free host memory
+    free(a);
+    free(b);
+    free(c);
+
     return 0;
 }
+
 
 
